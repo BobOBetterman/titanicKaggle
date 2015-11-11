@@ -2,11 +2,21 @@ library(tidyr)
 library(dplyr)
 
 # Set your working directory to wherever you want it to be
-setwd("C:/cygwin64/home/andrewHill/forFun/kaggle/titanic")
+# setwd("C:/cygwin64/home/andrewHill/forFun/kaggle/titanic/")
+setwd("C:/cygwin64/home/hill/forFun/kaggle/titanic/titanicKaggle")
 
 getCleanTruth <- function(tindata) {
     Y <- select(tinData, Survived)
     return(Y)
+}
+
+featureScaling <- function(xFeature) {
+  u <- mean(xFeature)
+  sigma <- sd(xFeature)
+  
+  xScale <- (xFeature - u) / sigma
+  
+  return(xScale)
 }
 
 getCleanFeatures <- function(tinData) {
@@ -37,6 +47,9 @@ getCleanFeatures <- function(tinData) {
     
     X <- cbind(1, X)
     
+    X$Age <- featureScaling(X$Age)
+    X$Fare <- featureScaling(X$Fare)
+    
     return(X)
 }
 
@@ -45,34 +58,75 @@ getSigmoid <- function(z) {
     return(g)
 }
 
+hypFunction <- function(theta, X) {
+  z = t(theta) %*% t(X)
+  
+  h = getSigmoid(z)
+  
+  return(h)
+}
+
 costFunction <- function(theta, X, Y) {
-    m = length(Y)
-    
-    z = t(theta) %*% t(X)
-    
-    h = getSigmoid(z)
-    
-    J = (1 / m) * (-(t(Y) %*% t(log(h))) - ((1 - t(Y)) %*% t(log(1 - h))))
-    
-    grad = (1 / m) * t((h - t(Y)) %*% X)
-    
-    Jgrad <- list("J" = J, "grad" = grad)
-    
-    return(Jgrad)
+  m = length(Y)
+  
+  z = t(theta) %*% t(X)
+  
+  h = getSigmoid(z)
+  
+  J = (1 / m) * (-(t(Y) %*% t(log(h))) - ((1 - t(Y)) %*% t(log(1 - h))))
+  
+  return(J)
+}
+
+gradFunction <- function(theta, X, Y) {
+  m = length(Y)
+  
+  z = t(theta) %*% t(X)
+  
+  h = getSigmoid(z)
+  
+  grad = (1 / m) * t((h - t(Y)) %*% X)
+  
+  return(grad)
 }
 
 tinData <- data.frame()
-tinData <- read.csv("data/train.csv", stringsAsFactors = FALSE)
+tinData <- read.csv("data/train.csv", nrows = 446, stringsAsFactors = FALSE)
 
-Y <- getCleanTruth(tinData)
-X <- getCleanFeatures(tinData)
+YTin <- getCleanTruth(tinData)
+XTin <- getCleanFeatures(tinData)
 
-Y <- data.matrix(Y)
-X <- data.matrix(X)
+Y <- data.matrix(YTin)
+X <- data.matrix(XTin)
 
 initialTheta <- matrix(0, ncol = 1, nrow = dim(X)[2])
 
-Jgrad <- costFunction(initialTheta, X, Y)
+# I can't figure out a way to use this, but if I don't, I'll have to calculate h twice,
+# which seems like a big waste of resources... But the first argument of costFunction
+# has to be theta... Wait--I don't have to USE the first argument... Let's try that.
+# Nope, doesn't work--if it optimized over a variable that wasn't in the function,
+# It would just be a constant...
 
-J <- Jgrad$J
-grad <- Jgrad$grad
+# h <- hypFunction(initialTheta, X)
+
+# J <- costFunction(initalTheta, X, Y)
+
+# grad <- gradFunction(initialTheta, X, Y)
+
+correctTheta <- optim(initialTheta, costFunction, gradFunction, X, Y, method = "BFGS")
+
+thetaPar <- correctTheta$par
+
+tinTest <- data.frame()
+tinTest <- read.csv("data/train.csv", stringsAsFactors = FALSE)
+
+tinTest <- tinTest[-c(1:445), ]
+
+YIntTest <- getCleanTruth(tinTest)
+XIntTest <- getCleanFeatures(tinTest)
+
+YTest <- data.matrix(YIntTest)
+XTest <- data.matrix(XIntTest)
+
+h <- hypFunction(thetaPar, XTest)
+hTest <- round(h)
